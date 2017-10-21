@@ -1,0 +1,82 @@
+
+
+Load.c //A writer
+========
+Create a shared memory segment to store the students records ;
+Create a shared memory segment to store the shared variable read_count;
+Create a semaphore set consisting of enough semaphores (actually 2 will do);
+Attach the two shared memory segments created;
+
+Wait(semaset, 0); // assuming semaset is the id of the semaphore set created
+Initialize read_count to 0 (the shared memory allocated for storing this var);
+Load the shared memory segment with data from the file;
+sleep(10) // for debugging and testing
+Signal(semaset, 0);
+---------------------
+
+Change.c //A writer
+========
+Get the id of the shared memory segments created for storing data;
+Attach the shared memory segments;
+Get the id of the semaphore set created;
+
+Prompt the user for password;
+Validate the password // just check if the user types 000;
+  ...
+Get the id of the student the user wants to modify;
+Get the new information about the student;
+
+Wait(semaset, 0)// assuming semaset is the id of the semaphore set 
+Search the shared memory for the student record with
+  the student id typed by the user;
+update the student record with new information;
+if the id is not found, print an error message;
+
+sleep(10) // for debugging and testing
+Signal(semaset, 0);
+-------------------------------
+Query.c  // A reader
+=======
+Get the ids of the two shared memory segments created in Load.c;
+Attach the shared memory segments; 
+Get the id of the semaphore set created in Load.c;
+Get the id of the student the user wants to query;
+Wait(semaset,1);
+increment read_count; // in shared memory
+if value of read_count==1 then Wait(semaset, 0);
+Signal(seamset,1);
+
+search the shared memory for the record of the student with the
+id, the user typed;
+if found print the results to the screen;
+if not print "record not found" to the screen;
+
+
+
+Wait(semaset,1);
+deccrement read_count; // in shared memory
+if value of read_count==0 then Signal(semaset, 0);
+Signal(seamset,1);
+----------------
+
+
+
+Print.c
+=======
+similar to Query.c  // A reader
+
+-------------------------
+Clean.c  // A writer
+=======
+Get the ids of the two shared memory segments created;
+Attach the shared memory segments;
+Get the id of the semaphore set created in Load.c;
+
+Wait(semaset, 0)// assuming semaset is the id of the semaphore set 
+write the contents of the shared memory to file in the format of the input file;
+delete the shared memory segments
+sleep(10) // for debugging and testing
+Signal(semaset, 0);
+
+delete the semaphores.
+

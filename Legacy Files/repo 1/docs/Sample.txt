@@ -1,0 +1,200 @@
+
+/* header.h */
+#define KEY  ((key_t)(124311)) /*change it to last five digits of your SID*/
+#define SEGSIZE  sizeof(struct StudentInfo)
+
+#define NUM_SEMAPHS 5
+#define SEMA_KEY   ((key_t)(44444)) /* change this to last four digits of SID */
+
+struct StudentInfo{
+  char fName[20];
+  char lName[20];
+  char telNumber[15];
+  char whoModified[10];
+};
+
+void Wait(int semaph, int n);
+void Signal(int semaph, int n);
+int GetSemaphs(key_t k, int n);
+//-----------------------------------------------
+
+/*header.c*/
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/sem.h>
+#include "header.h"
+
+/* Lock the semaphore n of the semaphore set semaph */
+
+void Wait(int semaph, int n)
+{
+  struct sembuf sop;
+  sop.sem_num = n;
+  sop.sem_op =  -1;
+  sop.sem_flg = 0;
+  semop(semaph,&sop,1);
+}
+
+/* Unlock the semaphore n of the semaphore set semaph */
+void Signal(int semaph, int n)
+{
+  struct sembuf sop;
+  sop.sem_num = n;
+  sop.sem_op =  1;
+  sop.sem_flg = 0;
+  semop(semaph,&sop,1);
+}
+
+/* make an array of n semaphores with key k */
+int GetSemaphs(key_t k, int n)
+{
+  int semid, i;
+
+  /* get a set of n semaphores with the given key k */
+  
+  if ((semid=semget(k,n,IPC_CREAT|0666))!= -1){
+    for (i=0;i<n;i++)
+      Signal(semid,i); /* unlock all the semaphores */
+  }
+  return semid;
+}
+
+//------------------------------------------------------------------
+
+ /* File create.c */
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/sem.h>
+#include "header.h"
+
+main()
+{
+  int i,id;
+  struct StudentInfo *infoptr;
+  int sema_set;
+
+  id = shmget(KEY, SEGSIZE,IPC_CREAT|0666);/* get shared memory to store data*/
+  if (id <0){
+    perror("create: shmget failed");
+    exit(1);
+}
+
+
+  infoptr=(struct StudentInfo *)shmat(id,0,0);/*attach the shared memory segment
+				       to the process's address space */
+  if (infoptr <= (struct StudentInfo *) (0)) {
+    perror("create: shmat failed");
+    exit(2);
+}
+
+  sema_set = GetSemaphs(SEMA_KEY, NUM_SEMAPHS); /* get a set of NUM_SEMAPHS
+						   semaphores*/
+  if ((sema_set < 0) ){
+    perror("create: semget failed");
+    exit(2);
+  }
+  
+/* store data in the shared memory segment */  
+  strcpy(infoptr->fName,"Joe");
+  strcpy(infoptr->lName, "Smith");
+  strcpy(infoptr->telNumber, "606-111-2222");
+  strcpy(infoptr->whoModified, " ");
+
+ 
+/*print the contents of the shared memory segment */ 
+
+  for(i=0;i<10;i++)
+    {
+      printf("the value of sema_set=%d\n", sema_set);
+      Wait(sema_set,1); 
+      printf("Name: %s %s\nPhone Number: %s\n",
+	     infoptr->fName,infoptr->lName,infoptr->telNumber);
+      printf("Last modified by: %s\n \n ", infoptr->whoModified);
+      sleep(2);
+      Signal(sema_set,1);
+  }
+
+  shmdt((char  *)infoptr); /* detach the shared memory segment */
+  shmctl(id, IPC_RMID,(struct shmid_ds *)0); /* destroy the shared memory segment*/
+  semctl(sema_set,0,IPC_RMID); /*Remove the semaphore set */
+  exit(0);
+}
+
+//------------------------------------------------
+
+/*File change.c */
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <sys/sem.h>
+#include <pwd.h>
+#include "header.h"
+
+main(int argc, char* argv[])
+{
+  int i,id;
+  struct StudentInfo *infoptr;
+  int sema_set;
+  if (argc != 4){
+    fprintf(stderr, "usage: change <first name> <last name> <phone number>\n");
+    exit(3);
+  } 
+
+/* get the id of the shared memory segment with key "KEY" */
+/* note that this is the segment where the data is stored */
+  id = shmget(KEY,SEGSIZE, 0);
+  if (id <0){
+    perror("change: shmget failed 1");
+    exit(1);
+  }
+
+/* attach the already created shared memory segment to infoptr so the
+   shared memory segment can be accessed through 'inforptr'
+   */
+  infoptr=(struct StudentInfo *)shmat(id,0,0);
+  if (infoptr <= (struct StudentInfo *) (0)) {
+    perror("change: shmat failed");
+    exit(2);
+  }
+
+/* get the id of the semaphore set associated with SEMA_KEY */ 
+  sema_set=semget(SEMA_KEY, 0,0); 
+  Wait(sema_set,1);
+  printf("the value of sema_set=%d\n", sema_set); 
+  strcpy(infoptr->fName,argv[1]);
+  strcpy(infoptr->lName, argv[2]);
+  sleep(10);
+  strcpy(infoptr->telNumber, argv[3]);
+  strcpy(infoptr->whoModified, (getpwuid(getuid()))->pw_name);
+  sleep(10);
+  Signal(sema_set,1); 
+  exit(0);
+
+}
+
+//-----------------
+/* a simple makefile */
+
+all: create change
+
+create: create.c header.h
+	gcc -o create create.c header.c
+change: change.c header.h
+	gcc -o change change.c header.c
+clean:
+	rm -f create  change  *~ core

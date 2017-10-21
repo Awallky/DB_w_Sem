@@ -1,0 +1,50 @@
+	/*
+	FILE *ini_file = fopen(argv[1], "r");
+	if( ini_file != NULL ){
+		size_t len = 0;
+		ssize_t bytes_read;
+		char *file_line = NULL;
+		int column_type = 0;
+		char f_name[20], l_name[20], sid[15];
+		char student_addr[50], tel_num[15];
+		char *name_buffer;
+
+		st = infoptr;
+		while( (bytes_read = getline(&file_line, &len, ini_file)) != -1 ){
+				switch(column_type){
+						case NAMECOLUMN:
+								name_buffer = strtok(file_line, " ");
+								strcpy(f_name, name_buffer);
+								name_buffer = strtok(NULL, "\n");
+								strcpy(l_name, name_buffer);
+								break;
+						case SIDCOLUMN:
+								name_buffer = strtok(file_line, "\n");
+								strcpy(sid, file_line);
+								break;
+						case ADDRCOLUMN:
+								name_buffer = strtok(file_line, "\n");
+								strcpy(student_addr, name_buffer);
+								break;
+						case TELNUMCOLUMN:
+								name_buffer = strtok(file_line, "\n");
+								strcpy(tel_num, name_buffer);
+
+								strcpy(st->fName, f_name);
+								strcpy(st->lName, l_name);
+								strcpy(st->studentID, sid);
+								strcpy(st->studentAddress, student_addr);
+								strcpy(st->telNumber, tel_num);
+								strcpy(st->whoModified, (getpwuid(getuid()))->pw_name);
+								st++;
+
+								num_of_students++;
+								break;
+						default:
+								break;
+				}
+				column_type = (column_type+1)%NUMCOLUMNS;
+		}
+		fclose(ini_file);
+	}
+	else{
